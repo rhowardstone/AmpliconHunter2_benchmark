@@ -13,7 +13,7 @@ cd src/
 git clone https://github.com/rhowardstone/AmpliconHunter.git
 cd AmpliconHunter
 pip install -e .
-cd ../../
+cd ..
 
 # Download the file from Google Drive
 echo "Downloading AmpliconHunter2_test-genomes.tar from Google Drive..."
