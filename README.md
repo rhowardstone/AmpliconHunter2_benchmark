@@ -19,13 +19,10 @@ bash run_benchmarks.sh results
 
 The following shorthand was applied in testing:
  - **AHv1** is *AmpliconHunter1.1* in the manuscript,
-&alpha;, &beta;
-$ \alpha, \beta $
-![alpha beta](https://latex.codecogs.com/svg.latex?\alpha+\beta)
 
-- **AHv2** is *AmpliconHunter2.$\alpha$*,
+- **AHv2** is *AmpliconHunter2.&alpha;*,
 
-- **AHv3** is *AmpliconHunter2.$\beta$*, and
+- **AHv3** is *AmpliconHunter2.&beta;*, and
 
 - **AHv4** is *AmpliconHunter2*.
 
