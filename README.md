@@ -22,7 +22,8 @@ The following shorthand was applied in testing:
 
 - **AHv2** is *AmpliconHunter2.&alpha;*,
 
-- **AHv3** is *AmpliconHunter2.&beta;*, and
+- **AHv3** is *AmpliconHunter2.&beta;*,
 
-- **AHv4** is *AmpliconHunter2*.
+- **AHv4** is *AmpliconHunter2.&gamma;*, and
 
+- **AHv5** is *AmpliconHunter2.
