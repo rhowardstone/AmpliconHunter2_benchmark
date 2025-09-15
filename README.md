@@ -1,9 +1,9 @@
 # AmpliconHunter2_benchmark
-Reproducibility scripts for the manuscript of AmpliconHunter2
+Reproducibility scripts for the manuscript of [AmpliconHunter2](https://github.com/rhowardstone/AmpliconHunter2)
 
 ### Setup & Installation
 
-Please run the following to install AmpliconHunter1.1, our test data, and prepare test directories:
+Please run the following to install [AmpliconHunter1.1](https://github.com/rhowardstone/AmpliconHunter), our test data, and prepare test directories:
 
 ```bash
 git clone https://github.com/rhowardstone/AmpliconHunter2_benchmark.git
@@ -18,7 +18,7 @@ bash run_benchmarks.sh results
 ```
 
 The following shorthand was applied in testing:
- - **AHv1** is *AmpliconHunter1.1* in the manuscript,
+ - **AHv1** is [*AmpliconHunter1.1*](https://github.com/rhowardstone/AmpliconHunter) in the manuscript,
 
 - **AHv2** is *AmpliconHunter2.&alpha;*,
 
@@ -26,4 +26,4 @@ The following shorthand was applied in testing:
 
 - **AHv4** is *AmpliconHunter2.&gamma;*, and
 
-- **AHv5** is *AmpliconHunter2.
+- **AHv5** is [*AmpliconHunter2*](https://github.com/rhowardstone/AmpliconHunter2).
