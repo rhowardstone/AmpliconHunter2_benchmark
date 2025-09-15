@@ -16,6 +16,7 @@ import matplotlib.gridspec as gridspec
 from matplotlib.gridspec import GridSpec
 from matplotlib.lines import Line2D
 import matplotlib.ticker as ticker
+from matplotlib.ticker import ScalarFormatter, FuncFormatter
 import seaborn as sns
 from scipy import stats
 from pathlib import Path
@@ -44,22 +45,38 @@ plt.rcParams['grid.linestyle'] = '--'
 
 # Define consistent colors for all versions
 # IMPORTANT: Internal naming vs Display naming
-# Internal (data files): AHv1, AHv2, AHv3, AHv4
-# Display (plots):        AHv1.1, AHv2.α, AHv2.β, AHv2
+# Internal (data files): AHv1, AHv2, AHv3, AHv4, AHv5
+# Display (plots):        AHv1.1, AHv2.α, AHv2.β, AHv2.γ, AHv2
 VERSION_COLORS = {
     'AHv1': '#2E86AB',   # Nice blue     -> displays as AHv1.1
     'AHv2': '#A23B72',   # Purple/magenta -> displays as AHv2.α
     'AHv3': '#F18F01',   # Orange        -> displays as AHv2.β
-    'AHv4': '#C73E1D'    # Red           -> displays as AHv2
+    'AHv4': '#C73E1D',   # Red           -> displays as AHv2.γ
+    'AHv5': '#1B998B'    # Teal/green    -> displays as AHv2 (with melting temp)
 }
 
 # Display name mapping for legends and labels
 DISPLAY_NAMES = {
     'AHv1': 'AHv1.1',
     'AHv2': 'AHv2.α',
-    'AHv3': 'AHv2.β', 
-    'AHv4': 'AHv2'
+    'AHv3': 'AHv2.β',
+    'AHv4': 'AHv2.γ',
+    'AHv5': 'AHv2'
 }
+
+def setup_log_axis_labels(ax, axis='y'):
+    """Set up axis to show actual numbers instead of powers for log scales"""
+    formatter = ScalarFormatter()
+    formatter.set_scientific(False)
+    formatter.set_useOffset(False)
+    
+    if axis == 'y':
+        ax.yaxis.set_major_formatter(formatter)
+        # Ensure we get nice round numbers on the axis
+        ax.yaxis.set_minor_formatter(ticker.NullFormatter())
+    else:
+        ax.xaxis.set_major_formatter(formatter)
+        ax.xaxis.set_minor_formatter(ticker.NullFormatter())
 
 def extract_metrics_from_log(log_file):
     """Extract comprehensive metrics from a log file"""
@@ -131,7 +148,7 @@ def collect_test_data(results_dir, test_num):
         datasets = ['G006400', 'G012800', 'G025600', 'G051200', 'G102400', 'G204800']
         genome_counts = [6400, 12800, 25600, 51200, 102400, 204800]
         
-        for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4']:
+        for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']:
             for dataset, genome_count in zip(datasets, genome_counts):
                 for repeat in range(1, 6):
                     base_path = f"{results_dir}/test1/{version}/{dataset}_repeat{repeat}"
@@ -156,7 +173,7 @@ def collect_test_data(results_dir, test_num):
         # Test 2: N-base experiment
         n_values = [0, 2, 4, 6]
         
-        for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4']:
+        for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']:
             for n in n_values:
                 for repeat in range(1, 6):
                     base_path = f"{results_dir}/test2/{version}/{n}N_repeat{repeat}"
@@ -180,7 +197,7 @@ def collect_test_data(results_dir, test_num):
         # Test 3: Mismatch variation
         mismatches = [0, 1, 2, 3, 4, 5, 6]
         
-        for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4']:
+        for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']:
             for mm in mismatches:
                 for repeat in range(1, 6):
                     base_path = f"{results_dir}/test3/{version}/mm{mm}_repeat{repeat}"
@@ -204,7 +221,7 @@ def collect_test_data(results_dir, test_num):
         # Test 4: Thread scaling
         thread_counts = [1, 2, 4, 8, 16, 32, 64, 96, 128, 160, 190]
         
-        for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4']:
+        for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']:
             for threads in thread_counts:
                 for repeat in range(1, 4):  # Only 3 repeats for test 4
                     base_path = f"{results_dir}/test4/{version}/t{threads}_repeat{repeat}"
@@ -226,7 +243,7 @@ def collect_test_data(results_dir, test_num):
     
     elif test_num == 5:
         # Test 5: Hot vs Cold Cache
-        for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4']:
+        for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']:
             # Cold cache runs
             for repeat in range(1, 6):
                 base_path = f"{results_dir}/test5/{version}/cold_repeat{repeat}"
@@ -269,7 +286,7 @@ def collect_test_data(results_dir, test_num):
         # Test 6: Primer Pair Comparison
         primer_pairs = ['V3V4', 'Titan', 'V1V9']
         
-        for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4']:
+        for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']:
             for primer in primer_pairs:
                 for repeat in range(1, 6):
                     base_path = f"{results_dir}/test6/{version}/{primer}_repeat{repeat}"
@@ -335,7 +352,7 @@ def create_main_figure(output_dir, test_data):
     legend_labels = []
     
     # Get unique versions from the data
-    all_versions = ['AHv1', 'AHv2', 'AHv3', 'AHv4']
+    all_versions = ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']
     
     # Test 1: Input Size Scaling
     ax = fig.add_subplot(gs[0, 0])
@@ -349,7 +366,7 @@ def create_main_figure(output_dir, test_data):
             
             _, _, _, line = plot_with_ci(ax, x_values, y_values, DISPLAY_NAMES[version], 
                                          VERSION_COLORS[version])
-            if len(legend_lines) < 4:  # Only collect once
+            if len(legend_lines) < 5:  # Only collect once for all 5 versions
                 legend_lines.append(line)
                 legend_labels.append(DISPLAY_NAMES[version])
     
@@ -358,6 +375,7 @@ def create_main_figure(output_dir, test_data):
     ax.set_title('(A) Input Size Scaling', fontweight='bold', pad=10)
     ax.set_xscale('log', base=2)
     ax.set_yscale('log', base=2)
+    setup_log_axis_labels(ax, 'y')
     ax.grid(True, alpha=0.3, linestyle='--')
     # Set x-axis to show actual genome counts
     ax.set_xticks([6400, 12800, 25600, 51200, 102400, 204800])
@@ -384,6 +402,7 @@ def create_main_figure(output_dir, test_data):
     ax.set_ylabel('Runtime (s)', fontweight='bold')
     ax.set_title('(B) Primer Degeneracy Scaling', fontweight='bold', pad=10)
     ax.set_yscale('log', base=2)
+    setup_log_axis_labels(ax, 'y')
     ax.grid(True, alpha=0.3, linestyle='--')
     ax.set_xticks([0, 2, 4, 6])
     
@@ -407,6 +426,7 @@ def create_main_figure(output_dir, test_data):
     ax.set_ylabel('Runtime (s)', fontweight='bold')
     ax.set_title('(C) Mismatch Tolerance', fontweight='bold', pad=10)
     ax.set_yscale('log', base=2)
+    setup_log_axis_labels(ax, 'y')
     ax.grid(True, alpha=0.3, linestyle='--')
     ax.set_xticks(range(7))
     
@@ -431,6 +451,7 @@ def create_main_figure(output_dir, test_data):
     ax.set_title('(D) Thread Scaling', fontweight='bold', pad=10)
     ax.set_xscale('log', base=2)
     ax.set_yscale('log', base=2)
+    setup_log_axis_labels(ax, 'y')
     ax.grid(True, alpha=0.3, linestyle='--')
     ax.set_xticks([1, 2, 4, 8, 16, 32, 64, 128, 190])
     ax.set_xticklabels(['1', '2', '4', '8', '16', '32', '64', '128', '190'], fontweight='bold')
@@ -438,21 +459,21 @@ def create_main_figure(output_dir, test_data):
     for label in ax.get_yticklabels():
         label.set_fontweight('bold')
     
-    # Test 5: Cache Performance - Group by cache state with error bars
+    # Test 5: Buffering Effect - Group by buffering state with error bars
     ax = fig.add_subplot(gs[2, 0])
     df5 = test_data[5]
     
     if not df5.empty:
-        # Reorganize data to group by cache state
-        cache_states = ['cold', 'hot']
-        x = np.arange(len(cache_states))
-        width = 0.18
+        # Reorganize data to group by buffering state
+        buffer_states = ['cold', 'hot']
+        x = np.arange(len(buffer_states))
+        width = 0.15  # Adjusted for 5 versions
         
         for i, version in enumerate(all_versions):
             version_means = []
             version_errors = []
             
-            for state in cache_states:
+            for state in buffer_states:
                 times = df5[(df5['version'] == version) & (df5['cache_state'] == state)]['real_time'].values
                 if len(times) > 0:
                     mean, lower, upper = calculate_ci95(times)
@@ -468,11 +489,11 @@ def create_main_figure(output_dir, test_data):
                       color=VERSION_COLORS[version], capsize=4, alpha=0.8,
                       error_kw={'linewidth': 1.5, 'elinewidth': 1.5})
         
-        ax.set_xlabel('Cache State', fontweight='bold')
+        ax.set_xlabel('File Buffering', fontweight='bold')
         ax.set_ylabel('Runtime (s)', fontweight='bold')
-        ax.set_title('(E) Cache Performance', fontweight='bold', pad=10)
+        ax.set_title('(E) File Buffering Effect', fontweight='bold', pad=10)
         ax.set_xticks(x)
-        ax.set_xticklabels(['Cold', 'Hot'], fontweight='bold')
+        ax.set_xticklabels(['Unbuffered', 'Buffered'], fontweight='bold')
         ax.grid(True, alpha=0.3, linestyle='--', axis='y')
         
         for label in ax.get_yticklabels():
@@ -485,7 +506,7 @@ def create_main_figure(output_dir, test_data):
     if not df6.empty:
         primers = sorted(df6['primer_pair'].unique())
         x = np.arange(len(primers))
-        width = 0.18
+        width = 0.15  # Adjusted for 5 versions
         
         for i, version in enumerate(all_versions):
             version_means = []
@@ -541,14 +562,14 @@ def create_main_figure(output_dir, test_data):
     print("Created Figure 1: Runtime comparison")
 
 def create_memory_supplemental(output_dir, test_data):
-    """Create Supplemental Figure S1: Memory usage analysis with 3x2 layout like Figure 1"""
-    fig = plt.figure(figsize=(16, 14))
+    """Create Supplemental Figure S1: Memory usage analysis with 2x2 layout"""
+    fig = plt.figure(figsize=(14, 10))
     
-    # Create gridspec with same layout as Figure 1
-    gs = gridspec.GridSpec(3, 3, figure=fig, hspace=0.3, wspace=0.25,
+    # Create gridspec with 2x2 layout plus legend column
+    gs = gridspec.GridSpec(2, 3, figure=fig, hspace=0.3, wspace=0.25,
                           width_ratios=[1, 1, 0.15])
     
-    all_versions = ['AHv1', 'AHv2', 'AHv3', 'AHv4']
+    all_versions = ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']
     
     # Store legend elements
     legend_lines = []
@@ -568,7 +589,7 @@ def create_memory_supplemental(output_dir, test_data):
             
             _, _, _, line = plot_with_ci(ax, x_values, y_values, DISPLAY_NAMES[version], 
                                          VERSION_COLORS[version])
-            if len(legend_lines) < 4:
+            if len(legend_lines) < 5:
                 legend_lines.append(line)
                 legend_labels.append(DISPLAY_NAMES[version])
     
@@ -577,6 +598,7 @@ def create_memory_supplemental(output_dir, test_data):
     ax.set_title('(A) Input Size', fontweight='bold', pad=10)
     ax.set_xscale('log', base=2)
     ax.set_yscale('log', base=2)
+    setup_log_axis_labels(ax, 'y')
     ax.grid(True, alpha=0.3)
     # Set x-axis to show actual genome counts
     ax.set_xticks([6400, 12800, 25600, 51200, 102400, 204800])
@@ -659,86 +681,6 @@ def create_memory_supplemental(output_dir, test_data):
     for label in ax.get_yticklabels():
         label.set_fontweight('bold')
     
-    # Test 5: Memory for cache states - grouped bar with error bars
-    ax = fig.add_subplot(gs[2, 0])
-    df5 = test_data[5]
-    
-    if not df5.empty and 'max_memory_kb' in df5.columns:
-        cache_states = ['cold', 'hot']
-        x = np.arange(len(cache_states))
-        width = 0.18
-        
-        for i, version in enumerate(all_versions):
-            version_means = []
-            version_errors = []
-            
-            for state in cache_states:
-                df5_filtered = df5[(df5['version'] == version) & (df5['cache_state'] == state)].copy()
-                if not df5_filtered.empty:
-                    df5_filtered['max_memory_gb'] = df5_filtered['max_memory_kb'] / (1024 * 1024)
-                    mean, lower, upper = calculate_ci95(df5_filtered['max_memory_gb'].values)
-                    version_means.append(mean)
-                    version_errors.append(upper - mean)
-                else:
-                    version_means.append(0)
-                    version_errors.append(0)
-            
-            if any(m > 0 for m in version_means):
-                offset = (i - len(all_versions)/2 + 0.5) * width
-                ax.bar(x + offset, version_means, width, yerr=version_errors,
-                      color=VERSION_COLORS[version], alpha=0.8, capsize=4,
-                      error_kw={'linewidth': 1.5, 'elinewidth': 1.5})
-        
-        ax.set_xlabel('Cache State', fontweight='bold')
-        ax.set_ylabel('Peak Memory (GB)', fontweight='bold')
-        ax.set_title('(E) Cache State', fontweight='bold', pad=10)
-        ax.set_xticks(x)
-        ax.set_xticklabels(['Cold', 'Hot'], fontweight='bold')
-        ax.grid(True, alpha=0.3, axis='y')
-        
-        for label in ax.get_yticklabels():
-            label.set_fontweight('bold')
-    
-    # Test 6: Memory for different primers - grouped bar with error bars
-    ax = fig.add_subplot(gs[2, 1])
-    df6 = test_data[6]
-    
-    if not df6.empty and 'max_memory_kb' in df6.columns:
-        primers = sorted(df6['primer_pair'].unique())
-        x = np.arange(len(primers))
-        width = 0.18
-        
-        for i, version in enumerate(all_versions):
-            version_means = []
-            version_errors = []
-            
-            for primer in primers:
-                df6_filtered = df6[(df6['version'] == version) & (df6['primer_pair'] == primer)].copy()
-                if not df6_filtered.empty:
-                    df6_filtered['max_memory_gb'] = df6_filtered['max_memory_kb'] / (1024 * 1024)
-                    mean, lower, upper = calculate_ci95(df6_filtered['max_memory_gb'].values)
-                    version_means.append(mean)
-                    version_errors.append(upper - mean)
-                else:
-                    version_means.append(0)
-                    version_errors.append(0)
-            
-            if any(m > 0 for m in version_means):
-                offset = (i - len(all_versions)/2 + 0.5) * width
-                ax.bar(x + offset, version_means, width, yerr=version_errors,
-                      color=VERSION_COLORS[version], alpha=0.8, capsize=4,
-                      error_kw={'linewidth': 1.5, 'elinewidth': 1.5})
-        
-        ax.set_xlabel('Primer Pair', fontweight='bold')
-        ax.set_ylabel('Peak Memory (GB)', fontweight='bold')
-        ax.set_title('(F) Primer Pairs', fontweight='bold', pad=10)
-        ax.set_xticks(x)
-        ax.set_xticklabels(primers, fontweight='bold')
-        ax.grid(True, alpha=0.3, axis='y')
-        
-        for label in ax.get_yticklabels():
-            label.set_fontweight('bold')
-    
     # Add unified legend
     ax_legend = fig.add_subplot(gs[:, 2])
     ax_legend.axis('off')
@@ -758,7 +700,7 @@ def create_efficiency_analysis(output_dir, test_data):
     """Create Figure S2: Efficiency analysis with proper y-axis limits and bold text"""
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     
-    all_versions = ['AHv1', 'AHv2', 'AHv3', 'AHv4']
+    all_versions = ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']
     
     # Input size scaling efficiency
     ax = axes[0, 0]
@@ -887,12 +829,12 @@ def create_efficiency_analysis(output_dir, test_data):
     for label in ax.get_xticklabels() + ax.get_yticklabels():
         label.set_fontweight('bold')
     
-    # Cache efficiency
+    # File buffering efficiency
     ax = axes[1, 1]
     df5 = test_data[5]
     
     if not df5.empty:
-        cache_speedup = []
+        buffer_speedup = []
         
         for version in all_versions:
             cold_times = df5[(df5['version'] == version) & (df5['cache_state'] == 'cold')]['real_time'].values
@@ -903,16 +845,16 @@ def create_efficiency_analysis(output_dir, test_data):
                 hot_mean = np.mean(hot_times)
                 speedup = cold_mean / hot_mean if hot_mean > 0 else 1
                 
-                cache_speedup.append({
+                buffer_speedup.append({
                     'version': version,
                     'speedup': speedup,
                     'cold': cold_mean,
                     'hot': hot_mean
                 })
         
-        if cache_speedup:
-            x = np.arange(len(cache_speedup))
-            speedups = [d['speedup'] for d in cache_speedup]
+        if buffer_speedup:
+            x = np.arange(len(buffer_speedup))
+            speedups = [d['speedup'] for d in buffer_speedup]
             speedup_errors = []
             
             # Calculate error bars for speedup ratios
@@ -932,7 +874,7 @@ def create_efficiency_analysis(output_dir, test_data):
                 else:
                     speedup_errors.append(0)
             
-            colors = [VERSION_COLORS[d['version']] for d in cache_speedup]
+            colors = [VERSION_COLORS[d['version']] for d in buffer_speedup]
             
             bars = ax.bar(x, speedups, yerr=speedup_errors[:len(speedups)], 
                           color=colors, alpha=0.8, capsize=5,
@@ -940,12 +882,12 @@ def create_efficiency_analysis(output_dir, test_data):
             
             # NO text labels on bars - removed completely
             
-            ax.axhline(y=1, color='black', linestyle='--', alpha=0.5, label='No Cache Benefit')
+            ax.axhline(y=1, color='black', linestyle='--', alpha=0.5, label='No Buffering Benefit')
             ax.set_xlabel('Version', fontweight='bold')
-            ax.set_ylabel('Cache Speedup Factor', fontweight='bold')
-            ax.set_title('(D) Cache Performance Benefit', fontweight='bold')
+            ax.set_ylabel('Buffering Speedup Factor', fontweight='bold')
+            ax.set_title('(D) File Buffering Benefit', fontweight='bold')
             ax.set_xticks(x)
-            ax.set_xticklabels([DISPLAY_NAMES[d['version']] for d in cache_speedup], fontweight='bold')
+            ax.set_xticklabels([DISPLAY_NAMES[d['version']] for d in buffer_speedup], fontweight='bold')
             ax.grid(True, alpha=0.3, axis='y')
             ax.set_ylim(0, max(speedups) * 1.1)  # Adjust y limit without label headroom
             
@@ -965,7 +907,7 @@ def create_io_system_metrics(output_dir, test_data):
     gs = GridSpec(3, 3, figure=fig, hspace=0.3, wspace=0.25,
                   width_ratios=[1, 1, 0.15])
     
-    all_versions = ['AHv1', 'AHv2', 'AHv3', 'AHv4']
+    all_versions = ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']
     
     # Store legend elements
     legend_lines = []
@@ -994,7 +936,7 @@ def create_io_system_metrics(output_dir, test_data):
                     _, _, _, line = plot_with_ci(ax, x_values, y_values, version, 
                                                  VERSION_COLORS[version])
                     has_data = True
-                    if len(legend_lines) < 4:
+                    if len(legend_lines) < 5:
                         legend_lines.append(line)
                         legend_labels.append(DISPLAY_NAMES[version])
         
@@ -1004,6 +946,7 @@ def create_io_system_metrics(output_dir, test_data):
             ax.set_title('(A) I/O Read Volume', fontweight='bold')
             ax.set_xscale('log', base=2)
             ax.set_yscale('log', base=2)
+            setup_log_axis_labels(ax, 'y')
             ax.grid(True, alpha=0.3)
             # Set x-axis to show actual genome counts
             ax.set_xticks([6400, 12800, 25600, 51200, 102400, 204800])
@@ -1046,6 +989,7 @@ def create_io_system_metrics(output_dir, test_data):
             ax.set_title('(B) Context Switching', fontweight='bold')
             ax.set_xscale('log', base=2)
             ax.set_yscale('log', base=2)
+            setup_log_axis_labels(ax, 'y')
             ax.grid(True, alpha=0.3)
             # Set x-axis to show actual genome counts
             ax.set_xticks([6400, 12800, 25600, 51200, 102400, 204800])
@@ -1203,6 +1147,7 @@ def create_io_system_metrics(output_dir, test_data):
             ax.set_title('(F) Memory Reclaims', fontweight='bold')
             ax.set_xscale('log', base=2)
             ax.set_yscale('log', base=2)
+            setup_log_axis_labels(ax, 'y')
             ax.grid(True, alpha=0.3)
             # Set x-axis to show actual genome counts
             ax.set_xticks([6400, 12800, 25600, 51200, 102400, 204800])
