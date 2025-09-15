@@ -84,7 +84,10 @@ FASTA_DIR="${DATA_DIR}/fasta"
 PRIMERS="${DATA_DIR}/primers.txt"
 
 # All versions to test
-VERSIONS=("AHv1" "AHv2" "AHv3" "AHv4")
+# Uncomment the line below to test all versions:
+# VERSIONS=("AHv1" "AHv2" "AHv3" "AHv4" "AHv5")
+# Or set to test only specific versions:
+VERSIONS=("AHv5")
 
 # Create results directory structure for all versions
 for test_dir in test1 test2 test3 test4 test5 test6; do
@@ -94,7 +97,7 @@ for test_dir in test1 test2 test3 test4 test5 test6; do
 done
 
 # Settings for all tests
-THREADS=$(nproc)  # Use total CPU cores
+THREADS=$(nproc)  # Use actual CPU cores
 echo "Using ${THREADS} threads (based on CPU cores)"
 
 CLAMP=3
@@ -168,16 +171,20 @@ compress_genomes() {
     local output_dir="$3"
     local thread_count="${4:-$THREADS}"  # Optional thread count parameter
     
-    # Only AHv2, AHv3, and AHv4 need compression
-    if [[ "${version}" != "AHv2" && "${version}" != "AHv3" && "${version}" != "AHv4" ]]; then
+    # Only AHv2, AHv3, AHv4, and AHv5 need compression
+    if [[ "${version}" != "AHv2" && "${version}" != "AHv3" && "${version}" != "AHv4" && "${version}" != "AHv5" ]]; then
         echo "Skipping compression for ${version}"
         return 0
     fi
     
-    # AHv3 and AHv4 share the same compression
+    # AHv3-5 share the same compression
     if [ "${version}" == "AHv3" ]; then
         # Use AHv4's compressed data
         output_dir="${output_dir/AHv3/AHv4}"
+    fi
+    if [ "${version}" == "AHv5" ]; then
+        # Use AHv4's compressed data
+        output_dir="${output_dir/AHv5/AHv4}"
     fi
     
     if [ -d "${output_dir}" ] && [ "$(ls -A ${output_dir} 2>/dev/null)" ]; then
@@ -212,6 +219,9 @@ compress_genomes() {
             ;;
         "AHv4")
             COMPRESS_BINARY="./src/AHv4/amplicon_hunter"
+            ;;
+		"AHv5")
+            COMPRESS_BINARY="./src/AHv5/amplicon_hunter"
             ;;
     esac
     
@@ -295,12 +305,13 @@ run_benchmark() {
                 --clobber \
                 2>&1 | tee "${OUTPUT}.log"
             ;;
-        "AHv2"|"AHv3"|"AHv4")
+        "AHv2"|"AHv3"|"AHv4"|"AHv5")
             local BINARY
             case "${version}" in
                 "AHv2") BINARY="./src/AHv2/amplicon_hunter" ;;
                 "AHv3") BINARY="./src/AHv3/amplicon_hunter" ;;
                 "AHv4") BINARY="./src/AHv4/amplicon_hunter" ;;
+				"AHv5") BINARY="./src/AHv5/amplicon_hunter" ;;
             esac
             
             timeout ${TIMEOUT_SECONDS} /usr/bin/time -v ${BINARY} run \
@@ -368,19 +379,29 @@ if [ "$RUN_TEST1" = true ]; then
         find "${GENOME_DIR}" -name "*.fa" -type f > "${RESULTS_DIR}/test1/${GENOME_SIZE}_filelist.txt"
         
         # Prepare compression for versions that need it
-        for version in AHv2 AHv3 AHv4; do
+        for version in "${VERSIONS[@]}"; do
+            if [[ "${version}" == "AHv1" ]]; then
+                continue  # AHv1 doesn't use compression
+            fi
             if [ "${version}" == "AHv3" ]; then
                 # AHv3 uses AHv4's compression
+                continue
+            fi
+			if [ "${version}" == "AHv5" ]; then
+                # AHv5 uses AHv4's compression
                 continue
             fi
             compress_genomes "${version}" "${GENOME_DIR}" "${COMPRESSED_DIR}/${version}/${GENOME_SIZE}"
         done
         
         # Create list files for compressed versions
-        for version in AHv2 AHv3 AHv4; do
+        for version in "${VERSIONS[@]}"; do
             COMPRESS_VERSION="${version}"
             if [ "${version}" == "AHv3" ]; then
                 COMPRESS_VERSION="AHv4"  # AHv3 uses AHv4's compressed files
+            fi
+			if [ "${version}" == "AHv5" ]; then
+                COMPRESS_VERSION="AHv4"  # AHv5 uses AHv4's compressed files
             fi
             
             if [ -d "${COMPRESSED_DIR}/${COMPRESS_VERSION}/${GENOME_SIZE}" ]; then
@@ -392,13 +413,13 @@ if [ "$RUN_TEST1" = true ]; then
         for repeat in $(seq 1 ${REPEATS}); do
             echo "  Repeat ${repeat}/${REPEATS} for ${GENOME_COUNT} genomes"
             
-            # Rotate through all 4 versions
-            case $((repeat % 4)) in
-                1) ORDER=("AHv1" "AHv2" "AHv3" "AHv4") ;;
-                2) ORDER=("AHv2" "AHv3" "AHv4" "AHv1") ;;
-                3) ORDER=("AHv3" "AHv4" "AHv1" "AHv2") ;;
-                0) ORDER=("AHv4" "AHv1" "AHv2" "AHv3") ;;
-            esac
+            # Rotate through all versions dynamically
+            num_versions=${#VERSIONS[@]}
+            ORDER=()
+            for ((i=0; i<num_versions; i++)); do
+                idx=$(( (i + repeat - 1) % num_versions ))
+                ORDER+=("${VERSIONS[$idx]}")
+            done
             
             echo "    Order for this repeat: ${ORDER[*]}"
             
@@ -411,7 +432,7 @@ if [ "$RUN_TEST1" = true ]; then
                             "${RESULTS_DIR}/test1/AHv1/${GENOME_SIZE}_repeat${repeat}" \
                             "2"
                         ;;
-                    "AHv2"|"AHv3"|"AHv4")
+                    "AHv2"|"AHv3"|"AHv4"|"AHv5")
                         LIST_FILE="${RESULTS_DIR}/test1/${GENOME_SIZE}_${version}.list"
                         if [ -f "${LIST_FILE}" ]; then
                             run_benchmark "${version}" \
@@ -441,17 +462,29 @@ if [ "$RUN_TEST2" = true ]; then
     find "${GENOME_DIR}" -name "*.fa" -type f > "${RESULTS_DIR}/test2/${GENOME_SIZE}_filelist.txt"
 
     # Prepare compression for versions that need it
-    for version in AHv2 AHv3 AHv4; do
+    for version in "${VERSIONS[@]}"; do
+        if [[ "${version}" == "AHv1" ]]; then
+            continue  # AHv1 doesn't use compression
+        fi
         if [ "${version}" == "AHv3" ]; then
+            continue
+        fi
+		if [ "${version}" == "AHv5" ]; then
             continue
         fi
         compress_genomes "${version}" "${GENOME_DIR}" "${COMPRESSED_DIR}/${version}/${GENOME_SIZE}"
     done
 
     # Create list files for compressed versions
-    for version in AHv2 AHv3 AHv4; do
+    for version in "${VERSIONS[@]}"; do
+        if [[ "${version}" == "AHv1" ]]; then
+            continue  # AHv1 doesn't use compression
+        fi
         COMPRESS_VERSION="${version}"
         if [ "${version}" == "AHv3" ]; then
+            COMPRESS_VERSION="AHv4"
+        fi
+		if [ "${version}" == "AHv5" ]; then
             COMPRESS_VERSION="AHv4"
         fi
         
@@ -485,13 +518,13 @@ if [ "$RUN_TEST2" = true ]; then
         for repeat in $(seq 1 ${REPEATS}); do
             echo "  Repeat ${repeat}/${REPEATS} for ${n_count}N"
             
-            # Rotate through all 4 versions
-            case $((repeat % 4)) in
-                1) ORDER=("AHv1" "AHv2" "AHv3" "AHv4") ;;
-                2) ORDER=("AHv2" "AHv3" "AHv4" "AHv1") ;;
-                3) ORDER=("AHv3" "AHv4" "AHv1" "AHv2") ;;
-                0) ORDER=("AHv4" "AHv1" "AHv2" "AHv3") ;;
-            esac
+            # Rotate through all versions dynamically
+            num_versions=${#VERSIONS[@]}
+            ORDER=()
+            for ((i=0; i<num_versions; i++)); do
+                idx=$(( (i + repeat - 1) % num_versions ))
+                ORDER+=("${VERSIONS[$idx]}")
+            done
             
             echo "    Order for this repeat: ${ORDER[*]}"
             
@@ -504,7 +537,7 @@ if [ "$RUN_TEST2" = true ]; then
                             "${RESULTS_DIR}/test2/AHv1/${n_count}N_repeat${repeat}" \
                             "2"
                         ;;
-                    "AHv2"|"AHv3"|"AHv4")
+                    "AHv2"|"AHv3"|"AHv4"|"AHv5")
                         LIST_FILE="${RESULTS_DIR}/test2/${GENOME_SIZE}_${version}.list"
                         if [ -f "${LIST_FILE}" ]; then
                             run_benchmark "${version}" \
@@ -536,13 +569,13 @@ if [ "$RUN_TEST3" = true ]; then
         for repeat in $(seq 1 ${REPEATS}); do
             echo "  Repeat ${repeat}/${REPEATS} for ${mismatch} mismatches"
             
-            # Rotate through all 4 versions
-            case $((repeat % 4)) in
-                1) ORDER=("AHv1" "AHv2" "AHv3" "AHv4") ;;
-                2) ORDER=("AHv2" "AHv3" "AHv4" "AHv1") ;;
-                3) ORDER=("AHv3" "AHv4" "AHv1" "AHv2") ;;
-                0) ORDER=("AHv4" "AHv1" "AHv2" "AHv3") ;;
-            esac
+            # Rotate through all versions dynamically
+            num_versions=${#VERSIONS[@]}
+            ORDER=()
+            for ((i=0; i<num_versions; i++)); do
+                idx=$(( (i + repeat - 1) % num_versions ))
+                ORDER+=("${VERSIONS[$idx]}")
+            done
             
             echo "    Order for this repeat: ${ORDER[*]}"
             
@@ -555,7 +588,7 @@ if [ "$RUN_TEST3" = true ]; then
                             "${RESULTS_DIR}/test3/AHv1/mm${mismatch}_repeat${repeat}" \
                             "${mismatch}"
                         ;;
-                    "AHv2"|"AHv3"|"AHv4")
+                    "AHv2"|"AHv3"|"AHv4"|"AHv5")
                         LIST_FILE="${RESULTS_DIR}/test2/${GENOME_SIZE}_${version}.list"
                         if [ -f "${LIST_FILE}" ]; then
                             run_benchmark "${version}" \
@@ -598,9 +631,12 @@ if [ "$RUN_TEST4" = true ]; then
         echo "Testing with ${thread_count} threads..."
         
         # For compressed versions, recompress with the specified thread count
-        for version in AHv2 AHv3 AHv4; do
+        for version in "${VERSIONS[@]}"; do
             if [ "${version}" == "AHv3" ]; then
                 continue  # AHv3 uses AHv4's compression
+            fi
+			if [ "${version}" == "AHv5" ]; then
+                continue  # AHv5 uses AHv4's compression
             fi
             
             echo "  Compressing ${THREAD_GENOME_COUNT} genomes for ${version} with ${thread_count} threads..."
@@ -614,9 +650,12 @@ if [ "$RUN_TEST4" = true ]; then
         done
         
         # Create list files for compressed versions
-        for version in AHv2 AHv3 AHv4; do
+        for version in "${VERSIONS[@]}"; do
             COMPRESS_VERSION="${version}"
             if [ "${version}" == "AHv3" ]; then
+                COMPRESS_VERSION="AHv4"
+            fi
+			if [ "${version}" == "AHv5" ]; then
                 COMPRESS_VERSION="AHv4"
             fi
             
@@ -629,13 +668,13 @@ if [ "$RUN_TEST4" = true ]; then
         for repeat in $(seq 1 ${REPEATS}); do
             echo "  Repeat ${repeat}/${REPEATS} for ${thread_count} threads"
             
-            # Rotate through all 4 versions
-            case $((repeat % 4)) in
-                1) ORDER=("AHv1" "AHv2" "AHv3" "AHv4") ;;
-                2) ORDER=("AHv2" "AHv3" "AHv4" "AHv1") ;;
-                3) ORDER=("AHv3" "AHv4" "AHv1" "AHv2") ;;
-                0) ORDER=("AHv4" "AHv1" "AHv2" "AHv3") ;;
-            esac
+            # Rotate through all versions dynamically
+            num_versions=${#VERSIONS[@]}
+            ORDER=()
+            for ((i=0; i<num_versions; i++)); do
+                idx=$(( (i + repeat - 1) % num_versions ))
+                ORDER+=("${VERSIONS[$idx]}")
+            done
             
             echo "    Order for this repeat: ${ORDER[*]}"
             
@@ -651,7 +690,7 @@ if [ "$RUN_TEST4" = true ]; then
                             "2" \
                             "${thread_count}"
                         ;;
-                    "AHv2"|"AHv3"|"AHv4")
+                    "AHv2"|"AHv3"|"AHv4"|"AHv5")
                         THREAD_LIST="${RESULTS_DIR}/test4/${THREAD_DATASET}_t${thread_count}_${version}.list"
                         if [ -f "${THREAD_LIST}" ]; then
                             run_benchmark "${version}" \
@@ -687,7 +726,10 @@ if [ "$RUN_TEST5" = true ]; then
     fi
     
     # Create list files for compressed versions (reuse from test2)
-    for version in AHv2 AHv3 AHv4; do
+    for version in "${VERSIONS[@]}"; do
+        if [[ "${version}" == "AHv1" ]]; then
+            continue  # AHv1 doesn't use compression
+        fi
         SOURCE_LIST="${RESULTS_DIR}/test2/${CACHE_DATASET}_${version}.list"
         DEST_LIST="${RESULTS_DIR}/test5/${CACHE_DATASET}_${version}.list"
         if [ -f "${SOURCE_LIST}" ]; then
@@ -712,7 +754,7 @@ if [ "$RUN_TEST5" = true ]; then
                         "${THREADS}" \
                         true  # Clear cache
                     ;;
-                "AHv2"|"AHv3"|"AHv4")
+                "AHv2"|"AHv3"|"AHv4"|"AHv5")
                     LIST_FILE="${RESULTS_DIR}/test5/${CACHE_DATASET}_${version}.list"
                     if [ -f "${LIST_FILE}" ]; then
                         run_benchmark "${version}" \
@@ -745,7 +787,7 @@ if [ "$RUN_TEST5" = true ]; then
                     "${THREADS}" \
                     true  # Clear cache first for fair warmup
                 ;;
-            "AHv2"|"AHv3"|"AHv4")
+            "AHv2"|"AHv3"|"AHv4"|"AHv5")
                 LIST_FILE="${RESULTS_DIR}/test5/${CACHE_DATASET}_${version}.list"
                 if [ -f "${LIST_FILE}" ]; then
                     run_benchmark "${version}" \
@@ -773,7 +815,7 @@ if [ "$RUN_TEST5" = true ]; then
                         "${THREADS}" \
                         false  # Don't clear cache
                     ;;
-                "AHv2"|"AHv3"|"AHv4")
+                "AHv2"|"AHv3"|"AHv4"|"AHv5")
                     LIST_FILE="${RESULTS_DIR}/test5/${CACHE_DATASET}_${version}.list"
                     if [ -f "${LIST_FILE}" ]; then
                         run_benchmark "${version}" \
@@ -815,7 +857,10 @@ if [ "$RUN_TEST6" = true ]; then
     fi
     
     # Create list files for compressed versions (reuse from test2)
-    for version in AHv2 AHv3 AHv4; do
+    for version in "${VERSIONS[@]}"; do
+        if [[ "${version}" == "AHv1" ]]; then
+            continue  # AHv1 doesn't use compression
+        fi
         SOURCE_LIST="${RESULTS_DIR}/test2/${GENOME_SIZE}_${version}.list"
         DEST_LIST="${RESULTS_DIR}/test6/${GENOME_SIZE}_${version}.list"
         if [ -f "${SOURCE_LIST}" ]; then
@@ -825,6 +870,9 @@ if [ "$RUN_TEST6" = true ]; then
             COMPRESS_VERSION="${version}"
             if [ "${version}" == "AHv3" ]; then
                 COMPRESS_VERSION="AHv4"  # AHv3 uses AHv4's compressed files
+            fi
+			if [ "${version}" == "AHv5" ]; then
+                COMPRESS_VERSION="AHv4"  # AHv5 uses AHv4's compressed files
             fi
             
             if [ -d "${COMPRESSED_DIR}/${COMPRESS_VERSION}/${GENOME_SIZE}" ]; then
@@ -849,13 +897,13 @@ if [ "$RUN_TEST6" = true ]; then
         for repeat in $(seq 1 ${REPEATS}); do
             echo "  Repeat ${repeat}/${REPEATS} for ${PRIMER_NAME} primers"
             
-            # Rotate through all 4 versions
-            case $((repeat % 4)) in
-                1) ORDER=("AHv1" "AHv2" "AHv3" "AHv4") ;;
-                2) ORDER=("AHv2" "AHv3" "AHv4" "AHv1") ;;
-                3) ORDER=("AHv3" "AHv4" "AHv1" "AHv2") ;;
-                0) ORDER=("AHv4" "AHv1" "AHv2" "AHv3") ;;
-            esac
+            # Rotate through all versions dynamically
+            num_versions=${#VERSIONS[@]}
+            ORDER=()
+            for ((i=0; i<num_versions; i++)); do
+                idx=$(( (i + repeat - 1) % num_versions ))
+                ORDER+=("${VERSIONS[$idx]}")
+            done
             
             echo "    Order for this repeat: ${ORDER[*]}"
             
@@ -868,7 +916,7 @@ if [ "$RUN_TEST6" = true ]; then
                             "${RESULTS_DIR}/test6/AHv1/${PRIMER_NAME}_repeat${repeat}" \
                             "2"
                         ;;
-                    "AHv2"|"AHv3"|"AHv4")
+                    "AHv2"|"AHv3"|"AHv4"|"AHv5")
                         LIST_FILE="${RESULTS_DIR}/test6/${GENOME_SIZE}_${version}.list"
                         if [ -f "${LIST_FILE}" ]; then
                             run_benchmark "${version}" \
@@ -920,7 +968,7 @@ def collect_test1_results(results_dir):
     genome_sizes = ['G006400', 'G012800', 'G025600', 'G051200', 'G102400', 'G204800']
     genome_counts = [6400, 12800, 25600, 51200, 102400, 204800]
     
-    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4']:
+    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']:
         results[version] = {}
         for size, count in zip(genome_sizes, genome_counts):
             metrics = {'real_time': [], 'user_time': [], 'sys_time': [], 'max_memory': []}
@@ -951,7 +999,7 @@ def collect_test2_results(results_dir):
     results = {}
     n_counts = [0, 2, 4, 6]
     
-    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4']:
+    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']:
         results[version] = {}
         for n_count in n_counts:
             metrics = {'real_time': [], 'user_time': [], 'sys_time': [], 'max_memory': []}
@@ -982,7 +1030,7 @@ def collect_test3_results(results_dir):
     results = {}
     mismatch_counts = [0, 1, 2, 3, 4, 5, 6]
     
-    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4']:
+    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']:
         results[version] = {}
         for mm in mismatch_counts:
             metrics = {'real_time': [], 'user_time': [], 'sys_time': [], 'max_memory': []}
@@ -1013,7 +1061,7 @@ def collect_test4_results(results_dir):
     results = {}
     thread_counts = [1, 2, 4, 8, 16, 32, 64, 96, 128, 160, 190]
     
-    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4']:
+    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']:
         results[version] = {}
         for threads in thread_counts:
             metrics = {'real_time': [], 'user_time': [], 'sys_time': [], 'max_memory': []}
@@ -1043,7 +1091,7 @@ def collect_test5_results(results_dir):
     """Collect results for Test 5: Hot vs Cold Cache"""
     results = {}
     
-    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4']:
+    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']:
         results[version] = {'cold': {'real_time': [], 'user_time': [], 'sys_time': [], 'max_memory': []},
                            'hot': {'real_time': [], 'user_time': [], 'sys_time': [], 'max_memory': []}}
         
@@ -1090,7 +1138,7 @@ def collect_test6_results(results_dir):
     results = {}
     primer_pairs = ['V3V4', 'Titan', 'V1V9']
     
-    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4']:
+    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']:
         results[version] = {}
         for primer in primer_pairs:
             metrics = {'real_time': [], 'user_time': [], 'sys_time': [], 'max_memory': []}
@@ -1158,10 +1206,10 @@ print("-" * 40)
 test1_results = collect_test1_results(results_dir)
 
 print("\nReal Time (wall clock):")
-print("Genomes\t\tAHv1\t\tAHv2\t\tAHv3\t\tAHv4")
+print("Genomes\t\tAHv1\t\tAHv2\t\tAHv3\t\tAHv4\tAHv5")
 for count in [6400, 12800, 25600, 51200, 102400, 204800]:
     row = f"{count}\t\t"
-    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4']:
+    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']:
         if count in test1_results[version]:
             mean, std = calculate_stats(test1_results[version][count]['real_time'])
             if mean is not None:
@@ -1173,10 +1221,10 @@ for count in [6400, 12800, 25600, 51200, 102400, 204800]:
     print(row)
 
 print("\nMaximum Memory Usage:")
-print("Genomes\t\tAHv1\t\tAHv2\t\tAHv3\t\tAHv4")
+print("Genomes\t\tAHv1\t\tAHv2\t\tAHv3\t\tAHv4\tAHv5")
 for count in [6400, 12800, 25600, 51200, 102400, 204800]:
     row = f"{count}\t\t"
-    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4']:
+    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']:
         if count in test1_results[version]:
             mean, std = calculate_stats(test1_results[version][count]['max_memory'])
             if mean is not None:
@@ -1194,10 +1242,10 @@ print("-" * 40)
 test2_results = collect_test2_results(results_dir)
 
 print("\nReal Time (wall clock):")
-print("N-bases\t\tAHv1\t\tAHv2\t\tAHv3\t\tAHv4")
+print("N-bases\t\tAHv1\t\tAHv2\t\tAHv3\t\tAHv4\tAHv5")
 for n in ['0N', '2N', '4N', '6N']:
     row = f"{n}\t\t"
-    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4']:
+    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']:
         if n in test2_results[version]:
             mean, std = calculate_stats(test2_results[version][n]['real_time'])
             if mean is not None:
@@ -1215,10 +1263,10 @@ print("-" * 40)
 test3_results = collect_test3_results(results_dir)
 
 print("\nReal Time (wall clock):")
-print("Mismatches\tAHv1\t\tAHv2\t\tAHv3\t\tAHv4")
+print("Mismatches\tAHv1\t\tAHv2\t\tAHv3\t\tAHv4\tAHv5")
 for mm in [0, 1, 2, 3, 4, 5, 6]:
     row = f"{mm}\t\t"
-    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4']:
+    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']:
         if mm in test3_results[version]:
             mean, std = calculate_stats(test3_results[version][mm]['real_time'])
             if mean is not None:
@@ -1237,7 +1285,7 @@ test4_results = collect_test4_results(results_dir)
 
 print("\nReal Time for 190 threads:")
 print("Version\t\tRuntime")
-for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4']:
+for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']:
     if 190 in test4_results[version]:
         mean, std = calculate_stats(test4_results[version][190]['real_time'])
         if mean is not None:
@@ -1253,7 +1301,7 @@ test5_results = collect_test5_results(results_dir)
 
 print("\nCache Performance Comparison:")
 print("Version\t\tCold Cache\tHot Cache\tSpeedup")
-for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4']:
+for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']:
     cold_mean, cold_std = calculate_stats(test5_results[version]['cold']['real_time'])
     hot_mean, hot_std = calculate_stats(test5_results[version]['hot']['real_time'])
     
@@ -1270,10 +1318,10 @@ print("-" * 40)
 test6_results = collect_test6_results(results_dir)
 
 print("\nReal Time (wall clock):")
-print("Primer\t\tAHv1\t\tAHv2\t\tAHv3\t\tAHv4")
+print("Primer\t\tAHv1\t\tAHv2\t\tAHv3\t\tAHv4\tAHv5")
 for primer in ['V3V4', 'Titan', 'V1V9']:
     row = f"{primer}\t\t"
-    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4']:
+    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']:
         if primer in test6_results[version]:
             mean, std = calculate_stats(test6_results[version][primer]['real_time'])
             if mean is not None:
@@ -1285,10 +1333,10 @@ for primer in ['V3V4', 'Titan', 'V1V9']:
     print(row)
 
 print("\nMaximum Memory Usage:")
-print("Primer\t\tAHv1\t\tAHv2\t\tAHv3\t\tAHv4")
+print("Primer\t\tAHv1\t\tAHv2\t\tAHv3\t\tAHv4\tAHv5")
 for primer in ['V3V4', 'Titan', 'V1V9']:
     row = f"{primer}\t\t"
-    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4']:
+    for version in ['AHv1', 'AHv2', 'AHv3', 'AHv4', 'AHv5']:
         if primer in test6_results[version]:
             mean, std = calculate_stats(test6_results[version][primer]['max_memory'])
             if mean is not None:
@@ -1356,13 +1404,11 @@ fi
 echo "Benchmarking suite complete!"
 echo ""
 echo "SUMMARY:"
-echo "- Testing all 4 versions: AHv1, AHv2, AHv3, AHv4"
-echo "- AHv3 and AHv4 share compressed files"
-echo "- Added Test 5: Hot vs Cold Cache comparison"
-echo "- Added Test 6: Primer Pair Comparison (V3V4, Titan, V1V9)"
+echo "- Testing all 5 versions: AHv1, AHv2, AHv3, AHv4, and AHv5"
+echo "- AHv3-5 share compressed files"
 echo "- Rotation pattern ensures fair testing order"
 echo "- Using CPU core count: ${THREADS}"
 echo "- Results saved to: ${RESULTS_DIR}"
 echo ""
 echo "To generate publication figures, run:"
-echo "  python3 generate_publication_figures.py ${RESULTS_DIR} plots"
+echo "  python3 generate_publication_figures.py ${RESULTS_DIR}"
