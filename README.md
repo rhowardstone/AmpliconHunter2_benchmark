@@ -15,6 +15,7 @@ bash setup.sh
 ### Reproduction of results:
 ```bash
 bash run_benchmarks.sh results
+python generate_publication_figures.py results results-plots
 ```
 
 The following shorthand was applied in testing:
