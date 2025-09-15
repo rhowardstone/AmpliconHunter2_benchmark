@@ -84,10 +84,10 @@ FASTA_DIR="${DATA_DIR}/fasta"
 PRIMERS="${DATA_DIR}/primers.txt"
 
 # All versions to test
-# Uncomment the line below to test all versions:
-# VERSIONS=("AHv1" "AHv2" "AHv3" "AHv4" "AHv5")
-# Or set to test only specific versions:
-VERSIONS=("AHv5")
+# Comment the line below to not test all versions:
+VERSIONS=("AHv1" "AHv2" "AHv3" "AHv4" "AHv5")
+# And uncomment this to test only specific versions:
+# VERSIONS=("AHv5")
 
 # Create results directory structure for all versions
 for test_dir in test1 test2 test3 test4 test5 test6; do
