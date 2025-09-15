@@ -86,7 +86,7 @@ PRIMERS="${DATA_DIR}/primers.txt"
 # All versions to test
 # Comment the line below to not test all versions:
 VERSIONS=("AHv1" "AHv2" "AHv3" "AHv4" "AHv5")
-# And uncomment this to test only specific versions:
+# And uncomment this to instead test only specific versions:
 # VERSIONS=("AHv5")
 
 # Create results directory structure for all versions
