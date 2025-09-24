@@ -1,4 +1,4 @@
-# AmpliconHunter2_benchmark
+# [AmpliconHunter2](https://github.com/rhowardstone/AmpliconHunter2)_benchmark
 Reproducibility scripts for the manuscript of [AmpliconHunter2](https://github.com/rhowardstone/AmpliconHunter2)
 
 ### Setup & Installation
